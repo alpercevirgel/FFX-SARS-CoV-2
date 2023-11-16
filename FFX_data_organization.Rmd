@@ -1,0 +1,193 @@
+# library
+```{r message=FALSE, warning=FALSE, include=FALSE}
+source("codes/codes.R") #load the libraries
+analysis.path <- getwd()
+```
+
+```{r}
+
+
+```
+
+
+## create folders to save figures and tables
+```{r message=FALSE, warning=FALSE, include=FALSE}
+## output folders
+dir.create(file.path(analysis.path, "results"), showWarnings = FALSE)
+dir.create(file.path(analysis.path, "results/tables"), showWarnings = FALSE)
+dir.create(file.path(analysis.path, "results/figures"),showWarnings = FALSE)
+dir.create(file.path(analysis.path, "results/figures/PCA"),showWarnings = FALSE)
+dir.create(file.path(analysis.path, "results/figures/adults_vs_children"),showWarnings = FALSE)
+dir.create(file.path(analysis.path, "results/figures/mild_vs_moderate"),showWarnings = FALSE)
+dir.create(file.path(analysis.path, "results/figures/PRR"),showWarnings = FALSE)
+dir.create(file.path(analysis.path, "results/figures/PPP"),showWarnings = FALSE)
+
+PCA_save.dir <- file.path(analysis.path, "results/figures/PCA/")
+AvsC_save.dir <- file.path(analysis.path, "results/figures/adults_vs_children/")
+MivsMo_save.dir <- file.path(analysis.path, "results/figures/mild_vs_moderate/")
+PRR_save.dir <- file.path(analysis.path, "results/figures/PRR/")
+PPP_save.dir <- file.path(analysis.path, "results/figures/PPP/")
+```
+
+# data import
+## Import sample information
+```{r}
+## subset the age, age sample_groups and sex data 
+ffx_subject <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/1_Complete_analysis_per_project/FFX PBMC/metadata/FFX_database.xlsx",
+                            sheet = "subject",
+                          na = "NA") %>% 
+  mutate_at(c("sex","adult_child","timepoint","PCR_test","PCR_progress","severity_score","severity_text","severity_merged","assay_timepoint"), list(~factor(.))) %>%
+  mutate_at(c("subject_identifier","sample_identifier"), list(~as.character(.))) %>% 
+  as.data.frame()
+  
+head(ffx_subject)
+```
+
+## disease onset - days between start of symptoms and T1
+```{r}
+ffx_onset <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/1_Complete_analysis_per_project/FFX PBMC/metadata/FFX_database.xlsx",
+                            sheet = "onset_disease_timepoint",
+                          na = "NA") %>%
+    mutate_at(c("subject_identifier"), list(~as.character(.))) %>% 
+  as.data.frame()
+```
+
+# data organization - groups
+## PCR+ adults & children "si_1" 
+```{r}
+# first time positive test individuals sample identifier
+si_1 <- ffx_subject %>% 
+  filter(PCR_test %in% "Positive") %>%
+  distinct(subject_identifier, .keep_all = TRUE) %>%
+  dplyr::select(sample_identifier) %>%
+  as.data.frame() %>%
+  pull()
+```
+
+## PCR+ moderate vs severe adults "si_3" 
+```{r}
+si_3 <- ffx_subject %>%
+  filter(adult_child %in% "adult") %>%
+  filter(PCR_test %in% "Positive") %>%
+  dplyr::select(sample_identifier) %>%
+  as.data.frame() %>%
+  pull()
+```
+
+## Recovering individuals
+```{r}
+si_timecourse <- ffx_subject %>%
+  dplyr::select(subject_identifier,timepoint,PCR_progress) %>%
+  mutate_at(c("subject_identifier","timepoint","PCR_progress"), list(~as.character(.))) %>%
+  reshape(idvar = "subject_identifier", timevar = "timepoint", direction = "wide") %>%
+  dplyr::select(-`PCR_progress.NA`)
+
+si_tc_PRR <- si_timecourse %>%
+  filter(PCR_progress.1 %in% "Positive") %>%
+  filter(PCR_progress.2 %in% "Recovered") %>%
+  filter(PCR_progress.3 %in% "Recovered") %>%
+  dplyr::select(subject_identifier) %>%
+  left_join(ffx_subject[,1:2], by="subject_identifier") %>%
+  dplyr::select(sample_identifier) %>%
+  pull()
+```
+
+## Consistently positive individuals
+```{r}
+si_tc_PPP <- si_timecourse %>%
+  filter(PCR_progress.1 %in% "Positive") %>%
+  filter(PCR_progress.2 %in% "Positive") %>%
+  filter(PCR_progress.3 %in% "Positive") %>%
+  dplyr::select(subject_identifier) %>%
+  left_join(ffx_subject[,1:2], by="subject_identifier") %>%
+  dplyr::select(sample_identifier) %>%
+  pull()
+
+si_tc_PPR <- si_timecourse %>%
+  filter(PCR_progress.1 %in% "Positive") %>%
+  filter(PCR_progress.2 %in% "Positive") %>%
+  filter(PCR_progress.3 %in% "Recovered") %>%
+  dplyr::select(subject_identifier) %>%
+  left_join(ffx_subject[,1:2], by="subject_identifier") %>%
+  dplyr::select(sample_identifier) %>%
+  pull()
+```
+
+## get the sample IDs needed for analysis
+```{r}
+sample_IDs_FFX <- c(si_1,si_3,si_tc_PRR,si_tc_PPP,si_tc_PPR) %>% unique() 
+
+subject_IDs_FFX <- ffx_subject %>%
+  filter(sample_identifier %in% sample_IDs_FFX) %>%
+  select(subject_identifier) %>%
+  pull() %>%
+  unique()
+```
+
+
+# FlowSOM clusters
+## import flowsom cluster per each subset
+```{r}
+fs_CD4 <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_5/R_analysis/Analysis/20230330_FlowSOM_allsubsets.xlsx",
+                            sheet = "CD4") %>% 
+  mutate_at(c("cluster_id"), list(~as.factor(.)))%>% 
+  mutate(cell_type = "CD4") %>%
+  as.data.frame()
+
+fs_CD8 <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_5/R_analysis/Analysis/20230330_FlowSOM_allsubsets.xlsx",
+                            sheet = "CD8") %>% 
+  mutate_at(c("cluster_id"), list(~as.factor(.)))%>% 
+  mutate(cell_type = "CD8") %>%
+  as.data.frame()
+
+fs_B <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_5/R_analysis/Analysis/20230330_FlowSOM_allsubsets.xlsx",
+                            sheet = "B") %>% 
+  mutate_at(c("cluster_id"), list(~as.factor(.)))%>% 
+  mutate(cell_type = "B") %>%
+  as.data.frame()
+
+fs_Mono <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_5/R_analysis/Analysis/20230330_FlowSOM_allsubsets.xlsx",
+                            sheet = "Mono") %>% 
+  mutate_at(c("cluster_id"), list(~as.factor(.)))%>% 
+  mutate(cell_type = "Mono") %>%
+  as.data.frame()
+
+fs_NK <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_5/R_analysis/Analysis/20230330_FlowSOM_allsubsets.xlsx",
+                            sheet = "NK") %>% 
+  mutate_at(c("cluster_id"), list(~as.factor(.)))%>% 
+  mutate(cell_type = "NK") %>%
+  as.data.frame()
+
+flowsom_long <- rbind(fs_CD4,fs_CD8,fs_B,fs_Mono,fs_NK) %>%
+  rename("sample_identifier"="sample_id") %>%
+  rename("percentage"="Freq") %>%
+  as.data.frame()
+
+flowsom_wide <- flowsom_long  %>%
+  pivot_wider(names_from = c(cell_type,cluster_id), values_from = percentage) %>%
+  as.data.frame()
+
+```
+
+## merge with metadata
+```{r}
+flowsom_df_long <- flowsom_long %>%
+  mutate(comp1_adultsvschildren_pos = ifelse(sample_identifier %in% si_2, "TRUE", "FALSE")) %>% 
+  mutate(comp2_mildvsmoderate_adult = ifelse(sample_identifier %in% si_3, "TRUE", "FALSE")) %>%
+  mutate(comp3_PRR = ifelse(sample_identifier %in% si_tc_PRR, "TRUE", "FALSE")) %>% 
+  mutate(comp4_PPP = ifelse(sample_identifier %in% si_tc_PPP, "TRUE", "FALSE")) %>%
+  dplyr::select(sample_identifier, comp1_adultsvschildren_pos, comp2_mildvsmoderate_adult, comp3_PRR, comp4_PPP, cell_type, cluster_id, percentage) %>%
+  left_join(ffx_subject, by="sample_identifier")
+
+flowsom_df_wide <- flowsom_wide %>%
+  mutate(comp1_adultsvschildren_pos = ifelse(sample_identifier %in% si_2, "TRUE", "FALSE")) %>% 
+  mutate(comp2_mildvsmoderate_adult = ifelse(sample_identifier %in% si_3, "TRUE", "FALSE")) %>%
+  mutate(comp3_PRR = ifelse(sample_identifier %in% si_tc_PRR, "TRUE", "FALSE")) %>% 
+  mutate(comp4_PPP = ifelse(sample_identifier %in% si_tc_PPP, "TRUE", "FALSE")) %>%
+  left_join(ffx_subject, by="sample_identifier") %>%
+  relocate(where(is.numeric), .after = last_col()) %>%
+  relocate(age, .after = adult_child)
+```
+
+
+

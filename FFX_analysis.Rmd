@@ -1,0 +1,946 @@
+---
+title: "Chapter_5"
+author: "Alper"
+date: "2022-11-18"
+output: html_document
+---
+
+# Table 1 demographics
+```{r}
+IDs_samples <- sample_IDs_FFX %>%
+  pull()
+
+IDs_subjects <- sample_IDs_FFX %>% 
+    mutate(subject_identifier = as.numeric(str_sub(as.character(samples_si), 1, -2))) %>%
+  dplyr::select(subject_identifier) %>%
+  pull() %>%
+  unique()
+ffx_subject %>%
+  filter(sample_identifier %in% IDs_samples) %>%
+  filter(timepoint %in% 1) %>%
+  mutate(severity_text = if_else(severity_text == "none", "mild", severity_text))%>%
+  group_by(adult_child) %>%
+  summarise(
+    total_cases = n(),
+    median_age = median(age),
+    min_age = min(age),
+    max_age = max(age),
+    number_female = sum(sex == 'female', na.rm = TRUE),
+    percentage_female = round(mean(sex == 'female', na.rm = TRUE) * 100, 1),
+    number_mild = sum(severity_text == 'mild', na.rm = TRUE),
+    percentage_mild = round(mean(severity_text == 'mild', na.rm = TRUE) * 100, 1),
+    number_moderate = sum(severity_text == 'moderate', na.rm = TRUE),
+    percentage_moderate = round(mean(severity_text == 'moderate', na.rm = TRUE) * 100, 1),
+    number_severe = sum(severity_text == 'severe', na.rm = TRUE),
+    percentage_severe = round(mean(severity_text == 'severe', na.rm = TRUE) * 100, 1),
+    percentage_total = percentage_mild+percentage_moderate+percentage_severe
+  ) 
+
+ffx_subject %>%
+  filter(sample_identifier %in% IDs_samples) %>%
+  filter(timepoint %in% 2) %>%
+  mutate(severity_text = if_else(severity_text == "none", "mild", severity_text))%>%
+  group_by(adult_child) %>%
+  summarise(
+    total_cases = n(),
+    median_age = median(age),
+    min_age = min(age),
+    max_age = max(age),
+    number_female = sum(sex == 'female', na.rm = TRUE),
+    percentage_female = round(mean(sex == 'female', na.rm = TRUE) * 100, 1),
+    number_mild = sum(severity_text == 'mild', na.rm = TRUE),
+    percentage_mild = round(mean(severity_text == 'mild', na.rm = TRUE) * 100, 1),
+    number_moderate = sum(severity_text == 'moderate', na.rm = TRUE),
+    percentage_moderate = round(mean(severity_text == 'moderate', na.rm = TRUE) * 100, 1),
+    number_severe = sum(severity_text == 'severe', na.rm = TRUE),
+    percentage_severe = round(mean(severity_text == 'severe', na.rm = TRUE) * 100, 1),
+    percentage_total = percentage_mild+percentage_moderate+percentage_severe
+  ) 
+
+ffx_subject %>%
+  filter(sample_identifier %in% IDs_samples) %>%
+  filter(timepoint %in% 3) %>%
+  mutate(severity_text = if_else(severity_text == "none", "mild", severity_text))%>%
+  group_by(adult_child) %>%
+  summarise(
+    total_cases = n(),
+    median_age = median(age),
+    min_age = min(age),
+    max_age = max(age),
+    number_female = sum(sex == 'female', na.rm = TRUE),
+    percentage_female = round(mean(sex == 'female', na.rm = TRUE) * 100, 1),
+    number_mild = sum(severity_text == 'mild', na.rm = TRUE),
+    percentage_mild = round(mean(severity_text == 'mild', na.rm = TRUE) * 100, 1),
+    number_moderate = sum(severity_text == 'moderate', na.rm = TRUE),
+    percentage_moderate = round(mean(severity_text == 'moderate', na.rm = TRUE) * 100, 1),
+    number_severe = sum(severity_text == 'severe', na.rm = TRUE),
+    percentage_severe = round(mean(severity_text == 'severe', na.rm = TRUE) * 100, 1),
+    percentage_total = percentage_mild+percentage_moderate+percentage_severe
+  ) 
+
+# number of adult subject_identifier
+ffx_subject %>%
+  filter(subject_identifier %in% IDs_subjects) %>% filter(adult_child %in% "adult") %>% select(subject_identifier) %>% pull() %>% unique()
+
+# number of adult subject_identifier
+ffx_subject %>%
+  filter(subject_identifier %in% IDs_subjects) %>% filter(adult_child %in% "child") %>% select(subject_identifier) %>% pull() %>% unique()
+```
+
+# Onset of symptoms and IQR
+```{r}
+ffx_onset %>%
+  filter(subject_identifier %in% subject_IDs_FFX) %>%
+  left_join(ffx_subject[c(2,8,11,12,13)]) %>%
+  group_by(adult_child) %>%
+  summarise(
+    median_T1_onset = median(T1_onset, na.rm = TRUE),
+    Q1_T1_onset = quantile(T1_onset, 0.25, na.rm = TRUE),
+    Q3_T1_onset = quantile(T1_onset, 0.75, na.rm = TRUE),
+    IQR_T1_onset = IQR(T1_onset, na.rm = TRUE)
+  )
+```
+
+
+# PCA for PCR+ adults vs children
+## data organization
+```{r}
+pca_immune_comp1 <- flowsom_df_wide  %>%
+  filter(comp1_adultsvschildren_pos %in% "TRUE") %>%
+  filter(adult_child %!in% "adult_control") %>%
+  dplyr::select(sample_identifier,contains(c("CD4_","CD8_","B_","Mono_","NK_"))) %>%
+  column_to_rownames(var = "sample_identifier") %>%
+  as.data.frame() %>%
+  na.omit()
+
+
+pca_subject_comp1 <- flowsom_df_wide  %>%
+  filter(comp1_adultsvschildren_pos %in% "TRUE") %>%
+  dplyr::select(sample_identifier, severity_text, severity_merged, sex, adult_child) %>%
+  filter(adult_child %!in% "adult_control") %>%
+  filter(sample_identifier %in% rownames(pca_immune_comp1)) %>%
+  column_to_rownames(var = "sample_identifier") %>%
+  as.data.frame()
+
+# timepoints of between first PCR+ sample
+## 1
+flowsom_df_wide  %>%
+  filter(comp1_adultsvschildren_pos %in% "TRUE") %>% 
+  filter(timepoint %in% 1)
+## 2
+flowsom_df_wide  %>%
+  filter(comp1_adultsvschildren_pos %in% "TRUE") %>% 
+  filter(timepoint %in% 2)
+```
+
+## plot PCAs
+```{r}
+## run PCA
+res.pca <- PCA(pca_immune_comp1, graph = TRUE) #dat is scaled
+
+## extract eigen values
+eig.val <- get_eigenvalue(res.pca) 
+
+## Screeplot visualise eigen values
+PCA_screeplot <- fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 25)) 
+pdf(file = paste0(PCA_save.dir, "PCA_screeplot_AvsC.pdf", sep=""), width =6 , height =5) ; PCA_screeplot ; dev.off()
+
+## Extract the results for individuals only
+var <- get_pca_var(res.pca)
+head(var$coord) #coordinates
+head(var$cos2) #Cos2: quality on the factore map
+head(var$contrib) #Contributions to the principal components
+
+x1 <-var$contrib
+x2 <-var$cos2
+
+## Extract the results for variables only
+ind <- get_pca_ind(res.pca)
+# head(ind$coord) #coordinates
+# head(ind$cos2) #Cos2: quality on the factore map
+# head(ind$contrib) #Contributions to the principal components
+
+
+## Generate PCA d7d0 predictors of HI
+## PCA, generating plots 
+## Visualization of PCA plot with geom density 
+pca_geomdens <- fviz_pca_ind(res.pca,
+                             geom.ind = "point", # show points only (but not "text")
+                             legend.title = "PCA density") + 
+geom_density_2d()
+
+## save
+pdf(file = paste0(PCA_save.dir, "PCA_density_AvsC.pdf", sep=""), width =5 , height =5) ; pca_geomdens ; dev.off()
+
+## Visualization of top 10 parameters,  cos2
+PCA_variable_cos2_topx <- fviz_pca_var(res.pca, 
+                                       col.var = "cos2",
+                                       gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                                       repel=TRUE,
+                                       title ="",
+                                       select.var = list(name = NULL, cos2 = 10, contrib = NULL))+theme_classic()
+## save
+pdf(file = paste0(PCA_save.dir, "PCA_variable_cos2_topx_AvsC.pdf", sep=""), width =5 , height =4) ; PCA_variable_cos2_topx ; dev.off()
+
+
+## Visualization of cos2 all
+PCA_variable_cos2 <- fviz_pca_var(res.pca, 
+                                  col.var = "cos2",
+                                  gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                                  repel=TRUE,
+                                  alpha.var = "cos2",
+                                  title ="cos2 to PCs")+theme_classic()
+## save
+pdf(file = paste0(PCA_save.dir, "PCA_variable_cos2_AvsC.pdf", sep=""), width =10 , height =10) ; PCA_variable_cos2 ; dev.off()
+
+
+## PCA with PCR+ adults, children 
+pdf(file = paste0(PCA_save.dir,"PCA_AvsC_adults_children.pdf", sep=""), width =3.5 , height =3)
+fviz_pca_ind(res.pca,
+             geom.ind = "point", # show points only (but not "text")
+             habillage = as.factor(pca_subject_comp1$adult_child),
+             palette = c("#77AADD","#BBCC33"),
+             ellipse.type = c("t"),
+             addEllipses = TRUE,
+             pointsize = 0.9,
+             alpha.ind = 1
+             )+
+  theme_classic()
+dev.off()
+
+## location of individuals
+pdf(file = paste0(PCA_save.dir,"PCA_individuals_AvsC.pdf", sep=""), width =7 , height =7)
+fviz_pca_ind(res.pca,
+             geom.ind = "text", # show points only (but not "text")
+             gradient.cols = heat.colors(60),
+             legend.title = "")
+dev.off()
+
+```
+
+# PCA for PCR+ adults, mild vs moderate
+## data organization
+```{r}
+pca_immune_comp2 <- flowsom_df_wide  %>%
+  filter(comp2_mildvsmoderate_adult %in% "TRUE") %>%
+  dplyr::select(sample_identifier,contains(c("CD4_","CD8_","B_","Mono_","NK_"))) %>%
+  column_to_rownames(var = "sample_identifier") %>%
+  data.frame() %>%
+  na.omit()
+
+pca_subject_comp2 <- flowsom_df_wide  %>%
+  filter(comp2_mildvsmoderate_adult %in% "TRUE") %>%
+  dplyr::select(sample_identifier, severity_text, severity_merged, sex, adult_child) %>%
+  filter(sample_identifier %in% rownames(pca_immune_comp2))%>%
+  column_to_rownames(var = "sample_identifier") %>%
+  as.data.frame()
+
+# timepoints PCR+ sample
+## 1
+flowsom_df_wide  %>%
+  filter(comp2_mildvsmoderate_adult %in% "TRUE") %>% 
+  filter(timepoint %in% 1)
+
+## 2
+flowsom_df_wide  %>%
+  filter(comp2_mildvsmoderate_adult %in% "TRUE") %>% 
+  filter(timepoint %in% 2)
+
+
+```
+
+## plot PCA
+```{r}
+## run PCA
+res.pca <- PCA(pca_immune_comp2, graph = TRUE) #dat is scaled
+
+## extract eigen values
+eig.val <- get_eigenvalue(res.pca) 
+
+## Screeplot visualise eigen values
+PCA_screeplot <- fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 25)) 
+pdf(file = paste0(PCA_save.dir, "PCA_screeplot_MivsMo.pdf", sep=""), width =6 , height =5) ; PCA_screeplot ; dev.off()
+
+## Extract the results for individuals only
+var <- get_pca_var(res.pca)
+head(var$coord) #coordinates
+head(var$cos2) #Cos2: quality on the factore map
+head(var$contrib) #Contributions to the principal components
+
+x1 <-var$contrib
+x2 <-var$cos2
+
+## Extract the results for variables only
+ind <- get_pca_ind(res.pca)
+# head(ind$coord) #coordinates
+# head(ind$cos2) #Cos2: quality on the factore map
+# head(ind$contrib) #Contributions to the principal components
+
+
+## Generate PCA d7d0 predictors of HI
+## PCA, generating plots 
+## Visualization of PCA plot with geom density 
+pca_geomdens <- fviz_pca_ind(res.pca,
+                             geom.ind = "point", # show points only (but not "text")
+                             legend.title = "PCA density") + 
+geom_density_2d()
+
+## save
+pdf(file = paste0(PCA_save.dir, "PCA_density_MivsMo.pdf", sep=""), width =5 , height =5) ; pca_geomdens ; dev.off()
+
+## Visualization of top 10 parameters,  cos2
+PCA_variable_cos2_topx <- fviz_pca_var(res.pca, 
+                                       col.var = "cos2",
+                                       gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                                       repel=TRUE,
+                                       title ="",
+                                       select.var = list(name = NULL, cos2 = 10, contrib = NULL))+theme_classic()
+## save
+pdf(file = paste0(PCA_save.dir, "PCA_variable_cos2_topx_MivsMo.pdf", sep=""), width =5 , height =4) ; PCA_variable_cos2_topx ; dev.off()
+
+
+## Visualization of cos2 all
+PCA_variable_cos2 <- fviz_pca_var(res.pca, 
+                                  col.var = "cos2",
+                                  gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                                  repel=TRUE,
+                                  alpha.var = "cos2",
+                                  title ="cos2 to PCs")+theme_classic()
+## save
+pdf(file = paste0(PCA_save.dir, "PCA_variable_cos2_MivsMo.pdf", sep=""), width =10 , height =10) ; PCA_variable_cos2 ; dev.off()
+
+
+## PCA with severity
+pdf(file = paste0(PCA_save.dir,"PCA_MivsMo_severity_text.pdf", sep=""), width =4 , height =3)
+fviz_pca_ind(res.pca,
+             geom.ind = "point", # show points only (but not "text")
+             habillage = as.factor(pca_subject_comp2$severity_text),
+             palette = c("#44BB99","#77AADD", "#EE8866"),
+             ellipse.type = c("t"),
+             addEllipses = TRUE,
+             pointsize = 0.9,
+             alpha.ind = 1
+             )+
+  theme_classic()
+dev.off()
+
+## location of individuals
+pdf(file = paste0(PCA_save.dir,"PCA_individuals_MivsMo.pdf", sep=""), width =7 , height =7)
+fviz_pca_ind(res.pca,
+             geom.ind = "text", # show points only (but not "text")
+             gradient.cols = heat.colors(60),
+             legend.title = "")
+dev.off()
+
+```
+# Supplementary Table 1, Statistically different subsets between PCR+ adults and children
+```{r}
+df_stat <- flowsom_df_wide %>% 
+  filter(comp1_adultsvschildren_pos %in% "TRUE") %>%
+  filter(adult_child %!in% "adult_control") %>%
+  dplyr::select(sample_identifier,adult_child,contains(c("CD4_","CD8_","B_","Mono_","NK_")))
+  
+## subject identifier and cluster number as.character
+df_stat %<>% mutate_at(
+  c("adult_child"),
+  list(~as.character(.)))
+
+## melt
+df_stat_melt <- df_stat %>% 
+  reshape2::melt(.)
+df_stat_melt
+
+### kruskal.test and Dunn's test
+## With kruskal.test we identify overall which subsets are significant and then Dunn's test tells us which are different between pairs of clusters
+kw.test.all <- df_stat_melt %>% 
+  group_by(variable) %>% 
+  kruskal_test(value ~ adult_child) %>% 
+  adjust_pvalue(method = "BH") #BH correction
+
+kw.test.all.eff.size <- df_stat_melt %>% #effect size
+  group_by(variable) %>% 
+  kruskal_effsize(value ~ adult_child) 
+
+combine.kw <- kw.test.all %>% 
+  left_join(kw.test.all.eff.size, by="variable")
+
+## Number of variables with p.adj-value <0.05
+length(combine.kw$variable)
+
+## table summarizing effect size of the significant variables 
+table(combine.kw$magnitude)
+
+### Post-hoc analysis dunn's test, pairwise multiple comparisons to check which are significant in pairwise analysis.
+dun.test.pos <- df_stat_melt %>% 
+  group_by(variable) %>% 
+  dunn_test(value ~ adult_child, p.adjust.method = "BH", detailed = TRUE)
+
+head(dun.test.pos)
+dun.test.pos_sub <- dun.test.pos %>% filter(p.adj<=0.05) #filter non significant data
+
+dunntest_AvsC <- dun.test.pos_sub %>% arrange(-desc(p.adj))
+writexl::write_xlsx(dunntest_AvsC, paste0(analysis.path, "/results/tables/dunn_AvsC.xlsx", sep=""))
+```
+
+# Statistically different subsets between PCR+ mild, moderate and severe adults
+```{r}
+df_stat <- flowsom_df_wide %>% 
+  filter(comp2_mildvsmoderate_adult %in% "TRUE") %>%
+  dplyr::select(sample_identifier,severity_text,contains(c("CD4_","CD8_","B_","Mono_","NK_"))) %>%
+  dplyr::select(-Mono_12) %>%
+  droplevels()
+
+## subject identifier and cluster number as.character
+df_stat %<>% mutate_at(
+  c("severity_text"),
+  list(~as.character(.)))
+
+## melt
+df_stat_melt <- df_stat %>% 
+  reshape2::melt(.)
+df_stat_melt
+
+### kruskal.test and Dunn's test
+## With kruskal.test we identify overall which subsets are significant and then Dunn's test tells us which are different between pairs of clusters
+kw.test.all <- df_stat_melt %>% 
+  group_by(variable) %>% 
+  kruskal_test(value ~ severity_text) %>% 
+  adjust_pvalue(method = "BH") #BH correction
+
+kw.test.all.eff.size <- df_stat_melt %>% #effect size
+  group_by(variable) %>% 
+  kruskal_effsize(value ~ severity_text) 
+
+combine.kw <- kw.test.all %>% 
+  left_join(kw.test.all.eff.size, by="variable")
+
+## Number of variables with p.adj-value <0.05
+length(combine.kw$variable)
+
+## table summarizing effect size of the significant variables 
+table(combine.kw$magnitude)
+
+### Post-hoc analysis dunn's test, pairwise multiple comparisons to check which are significant in pairwise analysis.
+dun.test.pos <- df_stat_melt %>% 
+  group_by(variable) %>% 
+  do({
+    print(paste("Processing:", .[["variable"]][1]))
+    dunn_test(value ~ severity_text, data = ., p.adjust.method = "BH", detailed = TRUE)
+  })
+
+
+dun.test.pos_sub <- dun.test.pos %>% filter(p.adj<=0.05) #filter non significant data
+
+dunntest_A_MvsM2 <- dun.test.pos_sub %>% arrange(-desc(p.adj))
+
+writexl::write_xlsx(dunntest_A_MvsM2, paste0(analysis.path, "/results/tables/dunntest_A_MvsM2.xlsx", sep=""))
+```
+
+
+# Statistical analysis for PRR
+```{r}
+long_data <- flowsom_df_wide  %>%
+  filter(comp3_PRR %in% "TRUE") %>%
+  dplyr::select(subject_identifier,timepoint,contains(c("CD4_","CD8_","B_","Mono_","NK_"))) %>%
+  as.data.frame() %>% 
+  reshape2::melt(.)
+
+
+# Loop through the immune variables and perform the analysis
+immune_variables <- unique(long_data$variable)
+
+# Initialize an empty data frame to store the results
+anova_results <- data.frame(variable = character(),
+                            timepoint_p_value = numeric(),
+                            stringsAsFactors = FALSE)
+
+# Loop through the immune variables and perform the analysis
+for (var in immune_variables) {
+  sub_data <- long_data %>% filter(variable == var)
+  anova_result <- aov(value ~ timepoint + Error(subject_identifier/timepoint), data = sub_data)
+  anova_summary <- summary(anova_result)
+  
+  # Extract the p-value for the timepoint factor
+  timepoint_p_value <- anova_summary[[2]][[1]]["timepoint", "Pr(>F)"]
+
+  # Append the results to the data frame
+  anova_results <- anova_results %>%
+    add_row(variable = var,
+            timepoint_p_value = timepoint_p_value)
+}
+
+# Choose a significance level, e.g., 0.05
+significance_level <- 0.05
+
+# Filter for significant immune variables
+significant_variables_PRR <- anova_results %>%
+  filter(timepoint_p_value < significance_level)
+
+```
+
+# Plots PCR+ adults and children for significant subsets
+## data prep
+```{r echo=TRUE}
+sub_df <- flowsom_df_wide  %>%
+  filter(comp1_adultsvschildren_pos %in% "TRUE") %>%
+  filter(adult_child %!in% "adult_control") %>%
+  dplyr::select(sample_identifier,age,adult_child,contains(c("CD4_","CD8_","B_","Mono_","NK_"))) %>%
+  droplevels() %>%
+  as.data.frame()
+```
+
+## selection 
+```{r echo=TRUE}
+
+# Load the necessary libraries
+library(ggpubr)
+
+# Specify the names of the columns you want to loop through
+vars_to_plot <- c("CD4_11","NK_17", "CD8_5", "NK_19", "B_7", "CD4_2", "B_3","NK_21")
+
+# Initialize an empty list to store the plots
+plot_list <- list()
+
+# Loop through each variable and create a plot
+for (var in vars_to_plot) {
+  
+  # Create the plot
+  p <- ggplot(sub_df) +
+    geom_point(
+      aes(x = adult_child, y = !!sym(var), group = adult_child, color = adult_child),
+      position = position_jitter(width = 0.1, seed = 42),
+      size = 1,alpha=0.9,
+      show.legend = FALSE
+    ) +
+    geom_half_violin(
+      aes(x = adult_child, y = !!sym(var), group = adult_child, fill = adult_child),
+      side = "r",
+      position = position_nudge(0.13),
+    ) +
+    geom_half_boxplot(
+      aes(x = adult_child, y = !!sym(var), group = adult_child, fill = adult_child),
+      side = "l",
+      outlier.shape = NA,
+      center = FALSE,
+      errorbar.draw = FALSE,
+      width = .4,
+      position = position_nudge(-0.13),
+    ) +
+    theme_classic() +
+    stat_summary(aes(y = !!sym(var), x = adult_child), size = 0.2,
+                 position = position_nudge(-0.23)) +
+    scale_fill_manual(values = cols_c_AvsC) +
+    scale_color_manual(values = cols_c_AvsC) +
+    theme(legend.position = "none")+
+    xlab("")
+  
+  # Append the plot to the list
+  plot_list[[var]] <- p
+}
+
+# Arrange the plots in a grid and save as a single file
+combined_plot <- do.call(ggarrange, c(plot_list, list(ncol = 4)))
+
+ggsave(paste0(AvsC_save.dir, paste("AvsC_combined_plots.pdf"), sep=""),combined_plot, width = 8, height = 4)
+       
+```
+
+# Plots mild vs moderate adults for significant subsets
+## data prep 
+```{r echo=TRUE}
+sub_df <- flowsom_df_wide  %>%
+  filter(comp2_mildvsmoderate_adult %in% "TRUE") %>%
+  droplevels() %>%
+  as.data.frame()
+```
+
+## selection
+```{r echo=TRUE}
+# Specify the names of the columns you want to loop through
+vars_to_plot <- c("B_8" , "CD4_3", "Mono_4", "B_1", "B_9","B_19","NK_10","CD4_17")
+
+# Initialize an empty list to store the plots
+plot_list <- list()
+plot_list_log <- list()
+
+# Loop through each variable and create a plot
+for (var in vars_to_plot) {
+  
+  # Create the plot
+  p <- ggplot(sub_df) +
+    geom_point(
+      aes(x = severity_text, y = !!sym(var), group = severity_text, color = severity_text),
+      position = position_jitter(width = 0.1, seed = 42),
+      size = 1.5,
+      show.legend = FALSE
+    ) +
+    geom_half_violin(
+      aes(x = severity_text, y = !!sym(var), group = severity_text, fill = severity_text),
+      side = "r",
+      position = position_nudge(0.13),
+    ) +
+    geom_half_boxplot(
+      aes(x = severity_text, y = !!sym(var), group = severity_text, fill = severity_text),
+      side = "l",
+      outlier.shape = NA,
+      center = FALSE,
+      errorbar.draw = FALSE,
+      width = .4,
+      position = position_nudge(-0.13),
+    ) +
+    theme_classic() +
+    stat_summary(aes(y = !!sym(var), x = severity_text), size = 0.2,
+                 position = position_nudge(-0.23)) +
+    scale_fill_manual(values = cols_MivsMo2) +
+    scale_color_manual(values = cols_MivsMo2) +
+    theme(legend.position = "none")+
+    xlab("")
+  
+  # Append the plot to the list
+  plot_list[[var]] <- p
+}
+
+# Arrange the plots in a grid and save as a single file
+combined_plot <- do.call(ggarrange, c(plot_list, list(ncol = 3)))
+
+ggsave(paste0(MivsMo_save.dir, paste("MivsMo2_combined_severity_text_plots_all_lin.pdf"), sep=""),combined_plot, width = 6, height = 5)
+
+## plot some variables in log scae
+plot_list$B_19 <- plot_list$B_19 +scale_y_continuous(trans = 'log10') + annotation_logticks(sides="l")
+plot_list$B_8 <- plot_list$B_8 +scale_y_continuous(trans = 'log10') + annotation_logticks(sides="l")
+
+combined_plot <- do.call(ggarrange, c(plot_list, list(ncol = 3)))
+
+ggsave(paste0(MivsMo_save.dir, paste("MivsMo2_combined_severity_text_plots_lin_log.pdf"), sep=""),combined_plot, width = 6, height = 5)
+
+```
+
+
+# Plots PRR
+```{r}
+vars_to_plot <- c("B_8" , "CD4_3", "Mono_4", "B_1", "B_9","B_19","NK_10","CD4_17")
+
+sub_df <- flowsom_df_wide  %>%
+  filter(comp3_PRR %in% "TRUE") %>%
+  dplyr::select(subject_identifier,severity_text,timepoint,contains(c("CD4_","CD8_","B_","Mono_","NK_"))) %>%
+  as.data.frame() %>% 
+  mutate(severity_text = if_else(timepoint == 1, severity_text, "FALSE")) %>%
+  mutate(severity_text = if_else(severity_text %in% c("mild", "moderate", "none"), "FALSE", as.factor(severity_text)))
+
+sub_df$severe_case <- ifelse(sub_df$timepoint == 1 & sub_df$severity_text == "severe", "yes", "no")
+
+# Loop through each variable and create a plot
+for (var in vars_to_plot) {
+  
+ p <- ggplot(sub_df, aes(x = timepoint, y = !!sym(var), group = subject_identifier)) +
+    geom_point(aes(color = severe_case, shape = severe_case, size = severe_case),
+               show.legend = FALSE, alpha=0.5) +
+    geom_line(aes(color = subject_identifier), size = 0.5, alpha=0.5) +
+    geom_half_boxplot(aes(group = timepoint, fill = as.character(timepoint)), 
+                      outlier.shape = NA, center = FALSE, errorbar.draw = FALSE, width = .4, 
+                      position = position_nudge(-0.13)) +
+    theme_classic() +
+    theme(legend.position = "none") +
+    scale_color_manual(values = c("no" = "black", "yes" = "red")) +
+    scale_fill_manual(values = cols_TT_PRR) +
+    scale_shape_manual(values = c("no" = 16, "yes" = 19)) +  # circle is 16, cross is 3
+    scale_size_manual(values = c("no" = 1, "yes" = 2))  # change the size of points, 1 is for circle, 2 is for cross
+
+  
+  # Append the plot to the list
+  plot_list[[var]] <- p
+}
+
+plot_list$B_18 <- plot_list$B_18 +scale_y_continuous(trans = 'log10') + annotation_logticks(sides="l")
+plot_list$B_19 <- plot_list$B_19 +scale_y_continuous(trans = 'log10') + annotation_logticks(sides="l")
+
+# Combine the plots using ggarrange
+combined_plot <- do.call(ggarrange, c(plot_list, list(ncol = 3)))
+
+# Save the combined plot as a single file
+ggsave(paste0(PRR_save.dir, "combined_plots.pdf"), combined_plot, width = 10, height = 10)
+
+```
+
+
+# Plots PPP
+```{r}
+flowsom_df_wide %>%
+    dplyr::select(subject_identifier,timepoint,severity_text,comp3_PRR,comp4_PPP,sex,CD4_4) %>%
+  filter(comp3_PRR %in% "TRUE")
+
+sub_df <- flowsom_df_wide  %>%
+  dplyr::select(subject_identifier,timepoint,comp3_PRR,comp4_PPP,sex,contains(c("CD4_","CD8_","B_","Mono_","NK_"))) %>%
+  filter(timepoint %in% c("1","2","3")) %>%
+  droplevels() %>%
+  as.data.frame() 
+
+vars_to_plot <- c("CD4_4","CD4_5","CD8_11","Mono_2","B_1","B_9")
+
+# Create an empty list to store the individual plots
+plot_list <- list()
+
+for (var in vars_to_plot) {
+  
+  sub_df_1 <- sub_df[sub_df$comp4_PPP == "TRUE", ]
+  sub_df_2 <- sub_df[sub_df$comp3_PRR == "TRUE", ]
+  sub_df_1 <- sub_df_1 %>%
+    mutate(shape_val = ifelse(sex == "male", 4, 15))
+  
+  p <- ggplot() +
+    geom_half_boxplot(data = sub_df_2, aes(x = timepoint, y = !!sym(var), group = timepoint, fill = "grey"), 
+                      outlier.shape = NA, center = FALSE, errorbar.draw = FALSE, width = .4, position = position_nudge(0.13)) +
+    geom_point(data = sub_df_1, aes(x = timepoint, y = !!sym(var), group = subject_identifier, color = "#F5793A", shape = shape_val), size = 1.5, show.legend = FALSE) +
+    geom_line(data = sub_df_1, aes(x = timepoint, y = !!sym(var), group = subject_identifier, color = "#F5793A"), size = 0.5) +
+    geom_half_boxplot(data = sub_df_1, aes(x = timepoint, y = !!sym(var), group = timepoint, fill = "#F5793A"), 
+                      outlier.shape = NA, center = FALSE, errorbar.draw = FALSE, width = .4, position = position_nudge(-0.13)) +
+    theme_classic() +
+    theme(legend.position = "none") +
+    scale_fill_identity(guide = "none") +
+    scale_shape_identity()  # Add this line to apply shapes directly
+
+  # Append the plot to the list
+  plot_list[[var]] <- p
+}
+
+# Combine the plots using ggarrange
+combined_plot <- do.call(ggarrange, c(plot_list, list(ncol = 3)))
+
+ggsave(paste0(PPP_save.dir, "combined_plots.pdf"), combined_plot, width =6, height = 3.5)
+```
+
+# Networks
+## adult vs children
+```{r}
+numeric_data_adult <- flowsom_df_wide %>% 
+  filter(comp1_adultsvschildren_pos %in% "TRUE")%>%
+  filter(adult_child %in% "adult") %>%
+  dplyr::select(where(is.numeric)) %>% 
+  dplyr::select(-c(age)) %>%
+  select_if(~!all(. == 0)) %>%
+  drop_na()
+
+numeric_data_clean <- numeric_data_adult %>%
+  select_if(~sd(.x) != 0)
+
+cor_matrix_adult <- cor(numeric_data_clean)
+
+group_labels <- sapply(strsplit(colnames(numeric_data_clean), "_"), "[[", 1)
+group_indices <- lapply(unique(group_labels), function(x) which(group_labels == x))
+names(group_indices) <- unique(group_labels)
+group_indices_adult <- group_indices
+
+
+numeric_data_child <- flowsom_df_wide %>% 
+  filter(comp1_adultsvschildren_pos %in% "TRUE")%>%
+  filter(adult_child %in% "child") %>%
+  # filter(comp2_mildvsmoderate_adult %in% "TRUE")%>%
+  dplyr::select(where(is.numeric)) %>% 
+  dplyr::select(-c(age)) %>%
+  select_if(~!all(. == 0)) %>%
+  drop_na()
+
+numeric_data_clean <- numeric_data_child %>%
+  select_if(~sd(.x) != 0)
+
+cor_matrix_child <- cor(numeric_data_clean)
+
+group_labels <- sapply(strsplit(colnames(numeric_data_clean), "_"), "[[", 1)
+group_indices <- lapply(unique(group_labels), function(x) which(group_labels == x))
+names(group_indices) <- unique(group_labels)
+group_indices_child <- group_indices
+```
+
+## mild, moderate, severe
+```{r}
+numeric_data_mild <- flowsom_df_wide %>% 
+  filter(comp2_mildvsmoderate_adult %in% "TRUE")%>%
+  filter(severity_text %in% "mild") %>%
+  dplyr::select(where(is.numeric)) %>% 
+  dplyr::select(-c(age)) %>%
+  select_if(~!all(. == 0)) %>%
+  drop_na()
+
+numeric_data_clean <- numeric_data_mild %>%
+  select_if(~sd(.x) != 0)
+
+cor_matrix_mild <- cor(numeric_data_clean)
+
+group_labels <- sapply(strsplit(colnames(numeric_data_clean), "_"), "[[", 1)
+group_indices <- lapply(unique(group_labels), function(x) which(group_labels == x))
+names(group_indices) <- unique(group_labels)
+group_indices_mild <- group_indices
+
+
+numeric_data_moderate <- flowsom_df_wide %>% 
+  filter(comp2_mildvsmoderate_adult %in% "TRUE")%>%
+  filter(severity_text %in% "moderate") %>%
+  dplyr::select(where(is.numeric)) %>% 
+  dplyr::select(-c(age)) %>%
+  select_if(~!all(. == 0)) %>%
+  drop_na()
+
+numeric_data_clean <- numeric_data_moderate %>%
+  select_if(~sd(.x) != 0)
+
+cor_matrix_moderate <- cor(numeric_data_clean)
+
+group_labels <- sapply(strsplit(colnames(numeric_data_clean), "_"), "[[", 1)
+group_indices <- lapply(unique(group_labels), function(x) which(group_labels == x))
+names(group_indices) <- unique(group_labels)
+group_indices_moderate <- group_indices
+
+numeric_data_severe <- flowsom_df_wide %>% 
+  filter(comp2_mildvsmoderate_adult %in% "TRUE")%>%
+  filter(severity_text %in% "severe") %>%
+  dplyr::select(where(is.numeric)) %>% 
+  dplyr::select(-c(age)) %>%
+  select_if(~!all(. == 0)) %>%
+  drop_na()
+
+numeric_data_clean <- numeric_data_severe %>%
+  select_if(~sd(.x) != 0)
+
+cor_matrix_severe <- cor(numeric_data_clean)
+
+group_labels <- sapply(strsplit(colnames(numeric_data_clean), "_"), "[[", 1)
+group_indices <- lapply(unique(group_labels), function(x) which(group_labels == x))
+names(group_indices) <- unique(group_labels)
+group_indices_severe <- group_indices
+```
+## save adult child
+```{r}
+# Open a new PDF file
+pdf("my_network_plots_AC_adult.pdf", height = 3.5, width = 3.5)
+cor_network_adult <- qgraph(cor_matrix_adult, 
+                            graph="cor",
+                            layout = "spring", 
+                            groups = group_indices_adult, 
+                            palette="colorblind",
+                            legend=FALSE, 
+                            label.scale.equal=TRUE,
+                            minimum="sig",
+                            sampleSize=nrow(numeric_data_adult),
+                            threshold=0.4,
+                            label.scale = T,
+                            vsize = 4)
+dev.off()
+
+pdf("my_network_plots_AC_child.pdf", height = 3.5, width = 3.5)
+cor_network_child <- qgraph(cor_matrix_child, 
+                            graph="cor",
+                            layout = "spring", 
+                            groups = group_indices_child, 
+                            palette="colorblind",
+                            legend=FALSE, 
+                            label.scale.equal=TRUE,
+                            minimum="sig",
+                            sampleSize=nrow(numeric_data_child),
+                            threshold=0.4,
+                            label.scale = T,
+                            vsize = 4)
+dev.off()
+
+pdf("my_network_plots_legend.pdf", height = 3.5, width = 3.5)
+cor_network_child <- qgraph(cor_matrix_child, 
+                            graph="cor",
+                            layout = "spring", 
+                            groups = group_indices_child, 
+                            palette="colorblind",
+                            legend=TRUE, 
+                            label.scale.equal=TRUE,
+                            minimum="sig",
+                            sampleSize=nrow(numeric_data_child),
+                            threshold=0.4,
+                            label.scale = T,
+                            vsize = 4)
+dev.off()
+
+```
+## save mild moderate severe
+```{r}
+pdf("my_network_plots_mild.pdf", height = 3.5, width = 3.5)
+cor_network_mild <- qgraph(cor_matrix_mild, 
+                            graph="cor",
+                            layout = "spring", 
+                            groups = group_indices_mild, 
+                            palette="colorblind",
+                            legend=FALSE, 
+                            label.scale.equal=TRUE,
+                            label.cex=1,
+                            minimum="sig",
+                            sampleSize=nrow(numeric_data_mild),
+                            threshold=0.4,
+                            vsize = 4)
+dev.off()
+
+pdf("my_network_plots_moderate.pdf", height = 3.5, width = 3.5)
+cor_network_moderate <- qgraph(cor_matrix_moderate, 
+                            graph="cor",
+                            layout = "spring", 
+                            groups = group_indices_moderate, 
+                            palette="colorblind",
+                            legend=FALSE, 
+                            label.scale.equal=TRUE,
+                            label.cex=1,
+                            minimum="sig",
+                            sampleSize=nrow(numeric_data_moderate),
+                            threshold=0.4,
+                            vsize = 4)
+dev.off()
+
+pdf("my_network_plots_severe.pdf", height = 3.5, width = 3.5)
+cor_network_severe <- qgraph(cor_matrix_severe, 
+                            graph="cor",
+                            layout = "spring", 
+                            groups = group_indices_severe, 
+                            palette="colorblind",
+                            legend=FALSE, 
+                            label.scale.equal=TRUE,
+                            label.cex=1,
+                            minimum="sig",
+                            sampleSize=nrow(numeric_data_severe),
+                            threshold=0.4,
+                            vsize = 4)
+
+# Close the PDF file
+dev.off()
+```
+
+## Supplementary Figure 2
+```{r}
+pdf("network_adult_child_measure.pdf", height = 7, width = 6)
+egg::ggarrange(
+
+centralityPlot(cor_network_adult,include = 
+               c("Strength","Betweenness","Closeness"),
+               orderBy ="Strength"),
+centralityPlot(cor_network_child,include = 
+               c("Strength","Betweenness","Closeness"),
+               orderBy ="Strength"),
+ncol=2
+
+)
+dev.off()
+```
+
+## Supplementary Figure 3
+```{r}
+pdf("network_severity_measure.pdf", height = 10, width = 8)
+egg::ggarrange(
+
+centralityPlot(cor_network_mild,include = 
+               c("Strength","Betweenness","Closeness"),
+               orderBy ="Strength"),
+centralityPlot(cor_network_moderate,include = 
+               c("Strength","Betweenness","Closeness"),
+               orderBy ="Strength"),
+centralityPlot(cor_network_severe,include = 
+               c("Strength","Betweenness","Closeness"),
+               orderBy ="Strength"),
+ncol=3
+
+)
+dev.off()
+```
+
