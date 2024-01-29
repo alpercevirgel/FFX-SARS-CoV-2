@@ -6,85 +6,136 @@ output: html_document
 ---
 
 # Table 1 demographics
+## adults vs children
 ```{r}
-IDs_samples <- sample_IDs_FFX %>%
-  pull()
+library(gtsummary)
+tabledata1<- flowsom_df_wide %>% 
+  filter(comp1_adultsvschildren_pos %in% "TRUE") %>%
+  filter(adult_child %!in% "adult_control") %>%
+  select(
+    comp1_adultsvschildren_pos,comp2_mildvsmoderate_adult,comp3_PRR,
+    timepoint, PCR_test, PCR_progress,severity_text, adult_child, sex, age,
+    contains(c("CD4_","CD8_","B_","Mono_","NK_"))) %>%
+  # na.omit() %>%
+  select(
+    timepoint,PCR_test,PCR_progress,severity_text, adult_child, sex, age) %>%
+  mutate_at(c("severity_text"), list(~as.factor(.))) %>% 
+  droplevels()
 
-IDs_subjects <- sample_IDs_FFX %>% 
-    mutate(subject_identifier = as.numeric(str_sub(as.character(samples_si), 1, -2))) %>%
-  dplyr::select(subject_identifier) %>%
-  pull() %>%
-  unique()
-ffx_subject %>%
-  filter(sample_identifier %in% IDs_samples) %>%
-  filter(timepoint %in% 1) %>%
-  mutate(severity_text = if_else(severity_text == "none", "mild", severity_text))%>%
+tabledata1 %>% 
+  filter(adult_child %in% "adult") %>%
+  tbl_summary(by = c(severity_text))
+
+
+tabledata1 %>% 
+  filter(adult_child %in% "child") %>%
+  tbl_summary(by = c(severity_text))
+
+tabledata1 %>%   tbl_summary(by = c(severity_text))
+
+
+
+# disease onset 
+flowsom_df_wide %>% 
+  full_join(ffx_onset, by="subject_identifier") %>%
+  filter(comp1_adultsvschildren_pos %in% "TRUE") %>%
+  filter(adult_child %!in% "adult_control") %>%
+  select(subject_identifier,T1_onset,
+    comp1_adultsvschildren_pos,comp2_mildvsmoderate_adult,comp3_PRR,
+    timepoint, PCR_test, PCR_progress,severity_text, adult_child, sex, age,
+    contains(c("CD4_","CD8_","B_","Mono_","NK_"))) %>%
   group_by(adult_child) %>%
   summarise(
-    total_cases = n(),
-    median_age = median(age),
-    min_age = min(age),
-    max_age = max(age),
-    number_female = sum(sex == 'female', na.rm = TRUE),
-    percentage_female = round(mean(sex == 'female', na.rm = TRUE) * 100, 1),
-    number_mild = sum(severity_text == 'mild', na.rm = TRUE),
-    percentage_mild = round(mean(severity_text == 'mild', na.rm = TRUE) * 100, 1),
-    number_moderate = sum(severity_text == 'moderate', na.rm = TRUE),
-    percentage_moderate = round(mean(severity_text == 'moderate', na.rm = TRUE) * 100, 1),
-    number_severe = sum(severity_text == 'severe', na.rm = TRUE),
-    percentage_severe = round(mean(severity_text == 'severe', na.rm = TRUE) * 100, 1),
-    percentage_total = percentage_mild+percentage_moderate+percentage_severe
-  ) 
+    median_T1_onset = median(T1_onset, na.rm = TRUE),
+    Q1_T1_onset = quantile(T1_onset, 0.25, na.rm = TRUE),
+    Q3_T1_onset = quantile(T1_onset, 0.75, na.rm = TRUE),
+    IQR_T1_onset = IQR(T1_onset, na.rm = TRUE)
+  )
+```
+### age distribution in children and adults
+```{r}
+tabledata1 %>% 
+  # filter(adult_child %in% "child") %>%
+  ggplot(aes(x=adult_child, y=age))+
+  geom_boxplot(aes(fill=adult_child), alpha=0.9,outlier.size=0,outlier.colour="white")+
+  geom_jitter(aes(fill=adult_child), alpha=0.5, width = 0.3, shape=21,size=1.5) +
+  theme_classic()+
+  theme(legend.position = "none")+
+  xlab("")+
+  ylab("Age (years)")
 
-ffx_subject %>%
-  filter(sample_identifier %in% IDs_samples) %>%
-  filter(timepoint %in% 2) %>%
-  mutate(severity_text = if_else(severity_text == "none", "mild", severity_text))%>%
-  group_by(adult_child) %>%
-  summarise(
-    total_cases = n(),
-    median_age = median(age),
-    min_age = min(age),
-    max_age = max(age),
-    number_female = sum(sex == 'female', na.rm = TRUE),
-    percentage_female = round(mean(sex == 'female', na.rm = TRUE) * 100, 1),
-    number_mild = sum(severity_text == 'mild', na.rm = TRUE),
-    percentage_mild = round(mean(severity_text == 'mild', na.rm = TRUE) * 100, 1),
-    number_moderate = sum(severity_text == 'moderate', na.rm = TRUE),
-    percentage_moderate = round(mean(severity_text == 'moderate', na.rm = TRUE) * 100, 1),
-    number_severe = sum(severity_text == 'severe', na.rm = TRUE),
-    percentage_severe = round(mean(severity_text == 'severe', na.rm = TRUE) * 100, 1),
-    percentage_total = percentage_mild+percentage_moderate+percentage_severe
-  ) 
 
-ffx_subject %>%
-  filter(sample_identifier %in% IDs_samples) %>%
-  filter(timepoint %in% 3) %>%
-  mutate(severity_text = if_else(severity_text == "none", "mild", severity_text))%>%
-  group_by(adult_child) %>%
-  summarise(
-    total_cases = n(),
-    median_age = median(age),
-    min_age = min(age),
-    max_age = max(age),
-    number_female = sum(sex == 'female', na.rm = TRUE),
-    percentage_female = round(mean(sex == 'female', na.rm = TRUE) * 100, 1),
-    number_mild = sum(severity_text == 'mild', na.rm = TRUE),
-    percentage_mild = round(mean(severity_text == 'mild', na.rm = TRUE) * 100, 1),
-    number_moderate = sum(severity_text == 'moderate', na.rm = TRUE),
-    percentage_moderate = round(mean(severity_text == 'moderate', na.rm = TRUE) * 100, 1),
-    number_severe = sum(severity_text == 'severe', na.rm = TRUE),
-    percentage_severe = round(mean(severity_text == 'severe', na.rm = TRUE) * 100, 1),
-    percentage_total = percentage_mild+percentage_moderate+percentage_severe
-  ) 
+ggsave(file = paste0(AvsC_save.dir, "adult_vs_children_age.png", sep=""), width =2 , height =3)
 
-# number of adult subject_identifier
-ffx_subject %>%
-  filter(subject_identifier %in% IDs_subjects) %>% filter(adult_child %in% "adult") %>% select(subject_identifier) %>% pull() %>% unique()
+tabledata1 %>% 
+  filter(adult_child %in% "child") %>%
+  ggplot(aes(x=adult_child, y=age))+
+  geom_boxplot(aes(fill=adult_child), alpha=0.9,outlier.size=0,outlier.colour="white")+
+  geom_jitter(aes(fill=adult_child), alpha=0.5, width = 0.3, shape=21,size=1.5) +
+  theme_classic()+
+  theme(legend.position = "none")+
+  xlab("")+
+  ylab("Age (years)")+
+  scale_y_continuous(breaks=seq(0,18,1))
 
-# number of adult subject_identifier
-ffx_subject %>%
-  filter(subject_identifier %in% IDs_subjects) %>% filter(adult_child %in% "child") %>% select(subject_identifier) %>% pull() %>% unique()
+
+ggsave(file = paste0(AvsC_save.dir, "children_age.png", sep=""), width =2 , height =3)
+```
+
+## disease severity
+```{r}
+tabledata2<- flowsom_df_wide %>% 
+  filter(comp2_mildvsmoderate_adult %in% "TRUE") %>%
+  select(
+    comp1_adultsvschildren_pos,comp2_mildvsmoderate_adult,comp3_PRR,
+    timepoint, PCR_test, PCR_progress,severity_text, adult_child, sex, age,
+    contains(c("CD4_","CD8_","B_","Mono_","NK_")))%>%  
+  filter(severity_text %!in% "none")%>%
+  # na.omit() %>%
+  select(
+    timepoint,PCR_test,PCR_progress,severity_text, adult_child, sex, age) %>%
+  mutate_at(c("severity_text"), list(~as.factor(.))) %>% 
+  droplevels()
+
+tabledata2 %>% 
+  filter(adult_child %in% "adult") %>%
+  tbl_summary(by = c(severity_text))
+
+df <- flowsom_df_wide %>% 
+  filter(comp2_mildvsmoderate_adult %in% "TRUE") %>%
+  select(subject_identifier,
+    comp1_adultsvschildren_pos,comp2_mildvsmoderate_adult,comp3_PRR,
+    timepoint, PCR_test, PCR_progress,severity_text, adult_child, sex, age,
+    contains(c("CD4_","CD8_","B_","Mono_","NK_")))%>%  
+  filter(severity_text %!in% "none")%>%
+  # na.omit() %>%
+  select(subject_identifier,
+    timepoint,PCR_test,PCR_progress,severity_text, adult_child, sex, age) %>%
+  mutate_at(c("severity_text"), list(~as.factor(.))) %>% 
+  droplevels() 
+
+df[duplicated(df$subject_identifier) | duplicated(df$subject_identifier, fromLast = TRUE), ]
+
+```
+
+## Recovering cases
+```{r}
+tabledata3<- flowsom_df_wide %>% 
+  filter(comp3_PRR %in% "TRUE") %>%
+  select(
+    comp1_adultsvschildren_pos,comp2_mildvsmoderate_adult,comp3_PRR,
+    timepoint, PCR_test, PCR_progress,severity_text, adult_child, sex, age,
+    contains(c("CD4_","CD8_","B_","Mono_","NK_")))%>%  
+  filter(severity_text %!in% "none")%>%
+  select(
+    timepoint,PCR_test,PCR_progress,severity_text, adult_child, sex, age) %>%
+  mutate(severity_text = if_else(severity_text == "none", "mild", severity_text)) %>%
+  mutate_at(c("severity_text"), list(~as.factor(.))) %>%
+  filter(timepoint %in% 1)
+
+tabledata3 %>% 
+  filter(adult_child %in% "adult") %>%
+  tbl_summary(by = c(severity_text))
 ```
 
 # Onset of symptoms and IQR
@@ -99,7 +150,10 @@ ffx_onset %>%
     Q3_T1_onset = quantile(T1_onset, 0.75, na.rm = TRUE),
     IQR_T1_onset = IQR(T1_onset, na.rm = TRUE)
   )
+
 ```
+
+
 
 
 # PCA for PCR+ adults vs children
@@ -662,52 +716,6 @@ ggsave(paste0(PRR_save.dir, "combined_plots.pdf"), combined_plot, width = 10, he
 
 ```
 
-
-# Plots PPP
-```{r}
-flowsom_df_wide %>%
-    dplyr::select(subject_identifier,timepoint,severity_text,comp3_PRR,comp4_PPP,sex,CD4_4) %>%
-  filter(comp3_PRR %in% "TRUE")
-
-sub_df <- flowsom_df_wide  %>%
-  dplyr::select(subject_identifier,timepoint,comp3_PRR,comp4_PPP,sex,contains(c("CD4_","CD8_","B_","Mono_","NK_"))) %>%
-  filter(timepoint %in% c("1","2","3")) %>%
-  droplevels() %>%
-  as.data.frame() 
-
-vars_to_plot <- c("CD4_4","CD4_5","CD8_11","Mono_2","B_1","B_9")
-
-# Create an empty list to store the individual plots
-plot_list <- list()
-
-for (var in vars_to_plot) {
-  
-  sub_df_1 <- sub_df[sub_df$comp4_PPP == "TRUE", ]
-  sub_df_2 <- sub_df[sub_df$comp3_PRR == "TRUE", ]
-  sub_df_1 <- sub_df_1 %>%
-    mutate(shape_val = ifelse(sex == "male", 4, 15))
-  
-  p <- ggplot() +
-    geom_half_boxplot(data = sub_df_2, aes(x = timepoint, y = !!sym(var), group = timepoint, fill = "grey"), 
-                      outlier.shape = NA, center = FALSE, errorbar.draw = FALSE, width = .4, position = position_nudge(0.13)) +
-    geom_point(data = sub_df_1, aes(x = timepoint, y = !!sym(var), group = subject_identifier, color = "#F5793A", shape = shape_val), size = 1.5, show.legend = FALSE) +
-    geom_line(data = sub_df_1, aes(x = timepoint, y = !!sym(var), group = subject_identifier, color = "#F5793A"), size = 0.5) +
-    geom_half_boxplot(data = sub_df_1, aes(x = timepoint, y = !!sym(var), group = timepoint, fill = "#F5793A"), 
-                      outlier.shape = NA, center = FALSE, errorbar.draw = FALSE, width = .4, position = position_nudge(-0.13)) +
-    theme_classic() +
-    theme(legend.position = "none") +
-    scale_fill_identity(guide = "none") +
-    scale_shape_identity()  # Add this line to apply shapes directly
-
-  # Append the plot to the list
-  plot_list[[var]] <- p
-}
-
-# Combine the plots using ggarrange
-combined_plot <- do.call(ggarrange, c(plot_list, list(ncol = 3)))
-
-ggsave(paste0(PPP_save.dir, "combined_plots.pdf"), combined_plot, width =6, height = 3.5)
-```
 
 # Networks
 ## adult vs children

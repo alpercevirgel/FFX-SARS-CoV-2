@@ -4,12 +4,6 @@ source("codes/codes.R") #load the libraries
 analysis.path <- getwd()
 ```
 
-```{r}
-
-
-```
-
-
 ## create folders to save figures and tables
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 ## output folders
