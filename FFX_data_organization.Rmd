@@ -1,6 +1,6 @@
 # library
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-source("codes/codes.R") #load the libraries
+source("codes.R") #load the libraries
 analysis.path <- getwd()
 ```
 
